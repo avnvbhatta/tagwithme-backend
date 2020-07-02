@@ -2,12 +2,10 @@ const LocalStrategy = require('passport-local').Strategy;
 const {pool} = require('./dbConfig')
 const bcrypt = require('bcrypt')
 
-
+//Initial login function 
 function initialize(passport) {
-    console.log("Initialized");
-  
     const authenticateUser = (email, password, done) => {
-      console.log(email, password);
+      //First check if email exists in the database.
       pool.query(
         `SELECT * FROM users WHERE email = $1`,
         [email],
@@ -15,24 +13,28 @@ function initialize(passport) {
           if (err) {
             throw err;
           }
-          console.log(results.rows);
   
+          //If email exists
           if (results.rows.length > 0) {
             const user = results.rows[0];
   
+            //Check if password is correct
             bcrypt.compare(password, user.password, (err, isMatch) => {
               if (err) {
                 console.log(err);
               }
+              //password matches
               if (isMatch) {
                 return done(null, user);
-              } else {
-                //password is incorrect
+              } 
+              //password is incorrect
+              else {
                 return done(null, false, { message: "Password is incorrect" });
               }
             });
-          } else {
-            // No user
+          } 
+          //If not email/user exists
+          else {
             return done(null, false, {
               message: "No user with that email address"
             });
@@ -41,6 +43,7 @@ function initialize(passport) {
       );
     };
   
+    //Use specified local strategy 
     passport.use(
       new LocalStrategy(
         { usernameField: "email", passwordField: "password" },
