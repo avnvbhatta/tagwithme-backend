@@ -92,7 +92,23 @@ const register = async (req, res) => {
   }
 }
 
+const createInterestedEvent = (req, res) =>{
+  // const { id, name, classification, date, images, url, venue, distance, address,
+  //   city, state, location, parking, priceRange, postalCode, userId } = req.body;
+  //   console.log(id, name, classification.segment, classification.genre, date.startTime, date.startDate, images[0].url, url, venue, distance, address, city.name, state.stateCode, location.longitude+','+location.latitude, parking, priceRange, postalCode, userId);  
 
+  //   pool.query(
+  //     `INSERT INTO events (id, name, segment, genre, starttime, startdate, images, url, venue, distance, address,city, state, location, parking, pricerange, postalcode, userid) 
+  //       VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+  //     `, [id, name, classification.segment, classification.genre, date.startTime, date.startDate, images[0].url, url, venue, distance, address, city.name, state.stateCode, location.longitude+','+location.latitude, parking, priceRange, postalCode, userId], (error, results) =>{
+  //       if(error){
+  //         throw error;
+  //       }
+  //       res.status(200).send({message: 'successfully added into events'})
+  //     }
+  //   )
+
+}
 
 
 module.exports = {
@@ -101,4 +117,5 @@ module.exports = {
     register,
     updateUser,
     deleteUser,
+    createInterestedEvent
 }

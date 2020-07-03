@@ -85,6 +85,9 @@ app.get('/login-status', isAuthenticated, (req, res) => {
   res.status(200).send(userInfo)
 });
 
+//Interested events
+app.post('/create-interested-event', isAuthenticated, db.createInterestedEvent)
+
 app.listen(port, () => {
     console.log(`App running on port ${port}.`)
 })
