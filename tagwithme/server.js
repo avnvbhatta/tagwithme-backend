@@ -10,8 +10,8 @@ const passport = require('passport')
 const initializePassport = require('./passportConfig')
 initializePassport(passport);
 
-
 app.use(cors())
+
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -86,7 +86,8 @@ app.get('/login-status', isAuthenticated, (req, res) => {
 });
 
 //Interested events
-app.post('/create-interested-event', isAuthenticated, db.createInterestedEvent)
+app.get('/get-interested-events/:userId',  db.getInterestedEvents)
+app.post('/create-interested-event', db.createInterestedEvent)
 
 app.listen(port, () => {
     console.log(`App running on port ${port}.`)
