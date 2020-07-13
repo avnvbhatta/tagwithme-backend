@@ -5,30 +5,18 @@ const app = express()
 const port = 4000
 require('dotenv').config()
 const db = require('./queries')
-const session = require('express-session')
 const passport = require('passport')
-const initializePassport = require('./passportConfig')
-initializePassport(passport);
+const jwt = require('jsonwebtoken');
+require('./auth');
 
 app.use(cors())
 
-app.use(session({
-  secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-}));
-app.use(bodyParser.json())
-app.use(
-  bodyParser.urlencoded({
-    extended: false,
-  })
-)
+app.use( bodyParser.urlencoded({ extended : false }) );
 
-app.use(passport.initialize());
-app.use(passport.session());
+
 
 //middleware to check if request is authenticated
-const isAuthenticated = require('./helpers/auth')
+ const isValidJWT = passport.authenticate('jwt', { session : false });
 
 /*
 * ROUTES-------------------------------------------------------------------------
@@ -38,56 +26,57 @@ app.get('/', (request, response) => {
 })
 
 //CRUD Operations
-app.get('/users', isAuthenticated, db.getUsers)
-app.get('/users/:id', isAuthenticated, db.getUserById)
-app.put('/users/:id', isAuthenticated, db.updateUser)
-app.delete('/users/:id', isAuthenticated, db.deleteUser)
+// app.get('/users', isAuthenticated, db.getUsers)
+// app.get('/users/:id', isAuthenticated, db.getUserById)
+// app.put('/users/:id', isAuthenticated, db.updateUser)
+// app.delete('/users/:id', isAuthenticated, db.deleteUser)
 
-//Register and Login Operations
+/*
+* ROUTES-> AUTHENTICATION ROUTES------------------------------------------------------------------------
+*/
 app.post('/users/register', db.register);
-app.post("/users/login", (req, res, next) => {
-  passport.authenticate("local", (err, user, info) => {
-    if (err) throw err;
-    if (!user) res.status(400).send([{message: "No User Exists"}]);
-    else {
-      req.logIn(user, (err) => {
-        if (err) throw err;
-        let userInfo = {
-          isAuthenticated: true,
-          userData : {
-            id: req.user.id,
-            name: req.user.name,
-            email: req.user.email
-          }
-        }
-        res.send(userInfo);
-      });
+app.post('/login', async (req, res, next) => {
+  passport.authenticate('login', async (err, user, info) => {     try {
+      if(err || !user){
+        const error = new Error('An Error occurred')
+        return next(error);
+      }
+      req.login(user, { session : false }, async (error) => {
+
+        if( error ) return next(error)
+        //We don't want to store the sensitive information such as the
+        //user password in the token so we pick only the email and id
+        const body = { id : user.id, name: user.name, email : user.email };
+        //Sign the JWT token and populate the payload with the user email and id
+        const token = jwt.sign({ user : body }, process.env.TOKEN_SECRET, {expiresIn: '1d'});
+        //Send back the token to the user
+        return res.json({ token });
+      });     } catch (error) {
+      return next(error);
     }
   })(req, res, next);
 });
 
-//Logout from session
-app.get('/logout', (req,res)=>{
-  req.logOut();
-  res.send({message: "Successfully logged out."});
-})
-
 //Get login status and send with user info
-app.get('/login-status', isAuthenticated, (req, res) => {
-  let userInfo = {
-    isAuthenticated: true,
-    userData : {
-      id: req.user.id,
-      name: req.user.name,
-      email: req.user.email
-    }
-  }
-  res.status(200).send(userInfo)
-});
+app.get('/login-status', isValidJWT, db.loginStatus);
+
+
+/*
+* ROUTES-> EVENT ROUTES------------------------------------------------------------------------
+*/
 
 //Interested events
-app.get('/get-interested-events/:userId',  db.getInterestedEvents)
-app.post('/create-interested-event', db.createInterestedEvent)
+app.get('/get-interested-events/:userId',  isValidJWT, db.getInterestedEvents)
+app.post('/create-interested-event', isValidJWT, db.createInterestedEvent)
+app.get('/profile', isValidJWT, db.profile);
+
+//Handle errors
+app.use((req, res, next) => {
+  res.status(404).send({
+  status: 404,
+  error: 'Not found'
+  })
+ })
 
 app.listen(port, () => {
     console.log(`App running on port ${port}.`)

@@ -126,6 +126,26 @@ const createInterestedEvent = (req, res) =>{
 
 }
 
+const loginStatus = (req, res) => {
+  let userInfo = {
+    isAuthenticated: true,
+    userData : {
+      id: req.user.id,
+      name: req.user.name,
+      email: req.user.email
+    }
+  }
+  res.status(200).send(userInfo)
+}
+
+const profile = (req, res) => {
+  res.status(200).send({
+    message : 'You made it to the secure route',
+    user : req.user,
+    token : req.query.secret_token
+  })
+}
+
 
 module.exports = {
     getUsers,
@@ -134,5 +154,7 @@ module.exports = {
     updateUser,
     deleteUser,
     createInterestedEvent,
-    getInterestedEvents
+    getInterestedEvents,
+    profile,
+    loginStatus
 }
