@@ -104,7 +104,19 @@ const getInterestedEvents = (req, res) =>{
         res.status(200).send(results.rows)
       }
     )
+}
 
+const deleteInterestedEvent = (req, res) =>{
+  const { eventId, userId}  = req.body;
+    pool.query(
+      `DELETE from events WHERE id=$1 AND userId = $2`, 
+       [eventId, userId], (error, results) =>{
+        if(error){
+          throw error;
+        }
+        res.status(200).send({message: 'successfully deleted'})
+      }
+    )
 }
 
 
@@ -118,9 +130,11 @@ const createInterestedEvent = (req, res) =>{
         VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, now())
       `, [id, name, classification.segment, classification.genre, date.startTime, date.startDate, images[0].url, url, venue, distance, address, city.name, state.stateCode, location.latitude, location.longitude, parking, priceRange, postalCode, userId], (error, results) =>{
         if(error){
-          throw error;
+          res.status(405).send({message: 'error inserting to table'})
         }
-        res.status(200).send({message: 'successfully added into events'})
+        else{
+          res.status(200).send({message: 'successfully added into events'})
+        }
       }
     )
 
@@ -156,6 +170,7 @@ module.exports = {
     deleteUser,
     createInterestedEvent,
     getInterestedEvents,
+    deleteInterestedEvent,
     profile,
     loginStatus
 }

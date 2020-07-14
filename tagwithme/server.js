@@ -69,6 +69,7 @@ app.get('/login-status', isValidJWT, db.loginStatus);
 //Interested events
 app.get('/get-interested-events/:userId',  isValidJWT, db.getInterestedEvents)
 app.post('/create-interested-event', isValidJWT, db.createInterestedEvent)
+app.delete('/create-interested-event', isValidJWT, db.deleteInterestedEvent)
 app.get('/profile', isValidJWT, db.profile);
 
 //Handle errors

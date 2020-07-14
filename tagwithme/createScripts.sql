@@ -35,6 +35,8 @@ CREATE TABLE events
 	timestamp TIMESTAMP
 );
 
+ALTER TABLE events ADD CONSTRAINT unique_events UNIQUE (id, userid)
+
 CREATE INDEX latlng_index ON events USING gist (ll_to_earth(lat, lng));
 
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO abhatta;
