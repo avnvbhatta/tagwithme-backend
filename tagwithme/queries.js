@@ -133,7 +133,8 @@ const loginStatus = (req, res) => {
       id: req.user.id,
       name: req.user.name,
       email: req.user.email
-    }
+    },
+    token : req.query.secret_token
   }
   res.status(200).send(userInfo)
 }

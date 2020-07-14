@@ -7,11 +7,11 @@ require('dotenv').config()
 const db = require('./queries')
 const passport = require('passport')
 const jwt = require('jsonwebtoken');
+app.use(bodyParser.json()); 
+app.use( bodyParser.urlencoded({ extended : false }) );
+app.use(cors())
 require('./auth');
 
-app.use(cors())
-
-app.use( bodyParser.urlencoded({ extended : false }) );
 
 
 
@@ -34,10 +34,11 @@ app.get('/', (request, response) => {
 /*
 * ROUTES-> AUTHENTICATION ROUTES------------------------------------------------------------------------
 */
-app.post('/users/register', db.register);
+app.post('/register', db.register);
 app.post('/login', async (req, res, next) => {
   passport.authenticate('login', async (err, user, info) => {     try {
       if(err || !user){
+        console.log(err)
         const error = new Error('An Error occurred')
         return next(error);
       }

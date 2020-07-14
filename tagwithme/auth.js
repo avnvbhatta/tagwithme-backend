@@ -19,8 +19,6 @@ passport.use('login', new localStrategy({
         [email],
         (err, results) => {
           if (err) {
-            console.log('in 25')
-
             throw err;
           }
   
@@ -71,7 +69,7 @@ passport.use(new JWTstrategy({
   //secret we used to sign our JWT
   secretOrKey : process.env.TOKEN_SECRET,
   //we expect the user to send the token as a query parameter with the name 'secret_token'
-  jwtFromRequest : ExtractJWT.fromUrlQueryParameter('secret_token')
+  jwtFromRequest : ExtractJWT.fromAuthHeaderAsBearerToken('secret_token')
 }, async (token, done) => {
   try {
     //Pass the user details to the next middleware
