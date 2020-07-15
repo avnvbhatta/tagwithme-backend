@@ -70,7 +70,7 @@ app.get('/login-status', isValidJWT, db.loginStatus);
 app.get('/get-interested-events/:userId',  isValidJWT, db.getInterestedEvents)
 app.post('/create-interested-event', isValidJWT, db.createInterestedEvent)
 app.delete('/create-interested-event', isValidJWT, db.deleteInterestedEvent)
-app.get('/profile', isValidJWT, db.profile);
+app.post('/global-feed-events', isValidJWT, db.getGlobalFeedEvents);
 
 //Handle errors
 app.use((req, res, next) => {

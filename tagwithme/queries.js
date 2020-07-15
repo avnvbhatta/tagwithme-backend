@@ -96,7 +96,9 @@ const getInterestedEvents = (req, res) =>{
   const userId = parseInt(req.params.userId)
     pool.query(
       `SELECT id, name, segment, genre, starttime, startdate, images, url, venue, distance, address, city,
-       state, lat, lng, parking, pricerange, postalcode, userid from events WHERE userId = $1`, 
+       state, lat, lng, parking, pricerange, postalcode, user_id from events e 
+       join interested_events ie on (ie.event_id = e.id)
+       WHERE user_Id = $1`, 
        [userId], (error, results) =>{
         if(error){
           throw error;
@@ -106,10 +108,53 @@ const getInterestedEvents = (req, res) =>{
     )
 }
 
+const createInterestedEvent = (req, res) =>{
+  const { id, name, segment, genre, startTime, startDate, images, url, venue, distance, address,
+    city, state, lat, lng, parking, priceRange, postalCode, userId } = req.body;
+
+    let errors = []
+    console.log('got here')
+    
+  // const { userId, eventId } = req.body;
+  pool.query(
+    `INSERT INTO events (id, name, segment, genre, starttime, startdate, images, url, venue, distance, address,city, state, lat, lng, parking, pricerange, postalcode) 
+      VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      ON CONFLICT (id) DO NOTHING
+    `, [id, name, segment, genre, startTime, startDate, images, url, venue, distance, address, city, state, lat, lng, parking, priceRange, postalCode], (error, results) =>{
+      if(error){
+        console.log(error)
+        errors.push(error)
+      }
+      
+    }
+  )
+
+  pool.query(
+    `INSERT INTO interested_events(user_id, event_id, timestamp)
+      VALUES ($1, $2, now())
+      `, [userId, id], (error, results) =>{
+      if(error){
+        console.log(error)
+
+        errors.push(error)
+      }
+
+    }
+  )
+
+  if(errors.length > 0){
+    res.status(405).send({error: errors})
+  }else{
+    res.status(200).send({message: 'Successfully added to tables'})
+  }
+
+}
+
+
 const deleteInterestedEvent = (req, res) =>{
   const { eventId, userId}  = req.body;
     pool.query(
-      `DELETE from events WHERE id=$1 AND userId = $2`, 
+      `delete from interested_events where event_id = $1 and user_id = $2 `, 
        [eventId, userId], (error, results) =>{
         if(error){
           throw error;
@@ -120,24 +165,24 @@ const deleteInterestedEvent = (req, res) =>{
 }
 
 
-const createInterestedEvent = (req, res) =>{
-  const { id, name, classification, date, images, url, venue, distance, address,
-    city, state, location, parking, priceRange, postalCode, userId } = req.body;
-    // console.log(id, name, classification.segment, classification.genre, date.startTime, date.startDate, images[0].url, url, venue, distance, address, city.name, state.stateCode, location.longitude+','+location.latitude, parking, priceRange, postalCode, userId);  
-
-    pool.query(
-      `INSERT INTO events (id, name, segment, genre, starttime, startdate, images, url, venue, distance, address,city, state, lat, lng, parking, pricerange, postalcode, userid, timestamp) 
-        VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, now())
-      `, [id, name, classification.segment, classification.genre, date.startTime, date.startDate, images[0].url, url, venue, distance, address, city.name, state.stateCode, location.latitude, location.longitude, parking, priceRange, postalCode, userId], (error, results) =>{
-        if(error){
-          res.status(405).send({message: 'error inserting to table'})
-        }
-        else{
-          res.status(200).send({message: 'successfully added into events'})
-        }
+const getGlobalFeedEvents = (req, res) => {
+  const {userId, lat, lng, radius} = req.body;
+  pool.query(
+    `SELECT e.id id, e.name, segment, genre, starttime, startdate, images, url, venue, distance, address, city,
+     state, lat, lng, parking, pricerange, postalcode, u.name userName, timestamp,
+     case when e.id in (select distinct event_id from interested_events where user_id = $4) then true else false end isInterested
+     from events e
+     JOIN interested_events ie on (ie.event_id = e.id)
+     JOIN users u on (ie.user_id = u.id)
+     WHERE earth_box(ll_to_earth($1, $2), ($3/0.8) * 10000) @> ll_to_earth(lat, lng) and u.id != $4;
+     `, 
+     [lat, lng, radius, userId], (error, results) =>{
+      if(error){
+        throw error;
       }
-    )
-
+      res.status(200).send(results.rows)
+    }
+  )
 }
 
 const loginStatus = (req, res) => {
@@ -171,6 +216,7 @@ module.exports = {
     createInterestedEvent,
     getInterestedEvents,
     deleteInterestedEvent,
+    getGlobalFeedEvents,
     profile,
     loginStatus
 }
