@@ -113,9 +113,6 @@ const createInterestedEvent = (req, res) =>{
     city, state, lat, lng, parking, priceRange, postalCode, userId } = req.body;
 
     let errors = []
-    console.log('got here')
-    
-  // const { userId, eventId } = req.body;
   pool.query(
     `INSERT INTO events (id, name, segment, genre, starttime, startdate, images, url, venue, distance, address,city, state, lat, lng, parking, pricerange, postalcode) 
       VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
@@ -168,8 +165,8 @@ const deleteInterestedEvent = (req, res) =>{
 const getGlobalFeedEvents = (req, res) => {
   const {userId, lat, lng, radius} = req.body;
   pool.query(
-    `SELECT e.id id, e.name, segment, genre, starttime, startdate, images, url, venue, distance, address, city,
-     state, lat, lng, parking, pricerange, postalcode, u.name userName, timestamp,
+    `SELECT e.id id, e.name, segment, genre, starttime, startdate, images, url, venue, distance, address, e.city,
+     e.state, lat, lng, parking, pricerange, postalcode, u.name userName, timestamp, u.imgurl,
      case when e.id in (select distinct event_id from interested_events where user_id = $4) then true else false end isInterested
      from events e
      JOIN interested_events ie on (ie.event_id = e.id)
@@ -185,13 +182,32 @@ const getGlobalFeedEvents = (req, res) => {
   )
 }
 
+
+const uploadProfilePic = (req, res) => {
+  const { filename } = req.file;
+  const userid = req.body.userid;
+  pool.query(
+    `UPDATE users SET imgurl = $1 where id = $2
+     `, 
+     [filename, userid], (error, results) =>{
+      if(error){
+        throw error;
+      }
+    }
+  )
+  return res.status(200).json({message: "Profile picture was updated", url:filename})
+}
+
 const loginStatus = (req, res) => {
   let userInfo = {
     isAuthenticated: true,
     userData : {
       id: req.user.id,
       name: req.user.name,
-      email: req.user.email
+      email: req.user.email,
+      city: req.user.city, 
+      state: req.user.state, 
+      imgurl: req.user.imgurl 
     },
     token : req.query.secret_token
   }
@@ -218,5 +234,6 @@ module.exports = {
     deleteInterestedEvent,
     getGlobalFeedEvents,
     profile,
-    loginStatus
+    loginStatus,
+    uploadProfilePic
 }
