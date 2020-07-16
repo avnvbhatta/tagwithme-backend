@@ -43,6 +43,11 @@ CREATE TABLE events
 CREATE INDEX latlng_index ON events USING gist (ll_to_earth(lat, lng));
 
 
+create table follower(
+	user_id bigint references users(id) not null,
+	follower_id bigint not null
+)
+
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO abhatta;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO abhatta;
 

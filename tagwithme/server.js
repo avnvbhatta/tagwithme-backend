@@ -45,12 +45,6 @@ app.get('/', (request, response) => {
 app.use('/uploads', express.static(__dirname + '/uploads'));
 
 
-//CRUD Operations
-// app.get('/users', isAuthenticated, db.getUsers)
-// app.get('/users/:id', isAuthenticated, db.getUserById)
-// app.put('/users/:id', isAuthenticated, db.updateUser)
-// app.delete('/users/:id', isAuthenticated, db.deleteUser)
-
 /*
 * ROUTES-> AUTHENTICATION ROUTES------------------------------------------------------------------------
 */
@@ -67,7 +61,7 @@ app.post('/login', async (req, res, next) => {
         if( error ) return next(error)
         //We don't want to store the sensitive information such as the
         //user password in the token so we pick only the email and id
-        const body = { id : user.id, name: user.name, email : user.email};
+        const body = { id : user.id, name: user.name, email : user.email, city: user.city, state: user.state, imgurl: user.imgurl};
         //Sign the JWT token and populate the payload with the user email and id
         const token = jwt.sign({ user : body }, process.env.TOKEN_SECRET, {expiresIn: '1d'});
         //Send back the token to the user
@@ -86,12 +80,23 @@ app.get('/login-status', isValidJWT, db.loginStatus);
 * ROUTES-> EVENT ROUTES------------------------------------------------------------------------
 */
 
+
+//CRUD Operations
+// app.get('/users', isAuthenticated, db.getUsers)
+app.get('/users/:id', isValidJWT, db.getUserById)
+// app.put('/users/:id', isAuthenticated, db.updateUser)
+// app.delete('/users/:id', isAuthenticated, db.deleteUser)
+
 //Interested events
 app.get('/get-interested-events/:userId',  isValidJWT, db.getInterestedEvents)
 app.post('/create-interested-event', isValidJWT, db.createInterestedEvent)
 app.delete('/create-interested-event', isValidJWT, db.deleteInterestedEvent)
 app.post('/global-feed-events', isValidJWT, db.getGlobalFeedEvents);
 
+//Follow actions
+app.post('/follow', isValidJWT, db.followUser)
+app.delete('/follow', isValidJWT, db.unfollowUser)
+app.get('/get-followers/:id', isValidJWT, db.getUserFollowers)
 
 //Image upload
 app.post('/profile-pic-upload', upload.single('picture'), db.uploadProfilePic);

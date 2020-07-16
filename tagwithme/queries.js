@@ -14,11 +14,19 @@ const getUsers = (request, response) => {
 //Get specific user by ID
 const getUserById = (request, response) => {
     const id = parseInt(request.params.id)
-    pool.query('SELECT * FROM users WHERE id = $1', [id], (error, results) => {
+    pool.query(
+    `SELECT id, name, city, state, imgurl, 
+    count(distinct f1.follower_id) followerCount,
+    count(distinct f2.user_id) followingCount
+    FROM users u
+    left join follower f1 on (u.id = f1.user_id)
+    left join follower f2 on (u.id = f2.follower_id) 
+    WHERE u.id = $1
+    group by id, name, city, state, imgurl`, [id], (error, results) => {
         if (error) {
             throw error
         }
-        response.status(200).json(results.rows)
+        response.status(200).send(results.rows[0])
     })
 }
 
@@ -166,7 +174,7 @@ const getGlobalFeedEvents = (req, res) => {
   const {userId, lat, lng, radius} = req.body;
   pool.query(
     `SELECT e.id id, e.name, segment, genre, starttime, startdate, images, url, venue, distance, address, e.city,
-     e.state, lat, lng, parking, pricerange, postalcode, u.name userName, timestamp, u.imgurl,
+     e.state, lat, lng, parking, pricerange, postalcode, u.name userName, timestamp, u.imgurl, u.id userid,
      case when e.id in (select distinct event_id from interested_events where user_id = $4) then true else false end isInterested
      from events e
      JOIN interested_events ie on (ie.event_id = e.id)
@@ -183,6 +191,55 @@ const getGlobalFeedEvents = (req, res) => {
 }
 
 
+const followUser = (req, res) => {
+    const{user_id, follower_id} = req.body;
+    pool.query(
+      `INSERT INTO follower(user_id, follower_id)
+        VALUES ($1, $2)
+      `, [user_id, follower_id], (error, results) => {
+        if(error){
+          throw error;
+        }
+        res.status(200).send({message: 'follow successful'})
+      }
+    )
+}
+
+const unfollowUser = (req, res) => {
+  const{user_id, follower_id} = req.body;
+  pool.query(
+    `DELETE FROM follower WHERE user_id=$1 and follower_id=$2`, [user_id, follower_id], (error, results) => {
+      if(error){
+        throw error;
+      }
+      res.status(200).send({message: 'unfollow successful'})
+    }
+  )
+}
+
+const getUserFollowers = async (req, res) => {
+    const id = parseInt(req.params.id)
+    let followers = [];
+    let following = [];
+    let result = await pool.query(
+    `select f.follower_id id, u.name , u.imgurl  
+    From follower f
+    join users u on (u.id = f.follower_id) 
+    where f.user_id = $1`, [id])
+    let rows = result.rows;
+    followers = rows;
+
+    result = await pool.query(
+      `select f.user_id id, u.name , u.imgurl  
+       From follower f
+       join users u on (u.id = f.user_id) 
+       where f.follower_id = $1`, [id])
+    rows = result.rows;
+    following = rows;
+    
+    res.status(200).send({followers, following})
+}
+
 const uploadProfilePic = (req, res) => {
   const { filename } = req.file;
   const userid = req.body.userid;
@@ -198,20 +255,35 @@ const uploadProfilePic = (req, res) => {
   return res.status(200).json({message: "Profile picture was updated", url:filename})
 }
 
-const loginStatus = (req, res) => {
-  let userInfo = {
-    isAuthenticated: true,
-    userData : {
-      id: req.user.id,
-      name: req.user.name,
-      email: req.user.email,
-      city: req.user.city, 
-      state: req.user.state, 
-      imgurl: req.user.imgurl 
-    },
-    token : req.query.secret_token
+const loginStatus = async (req, res) => {
+  
+  if(!req.isAuthenticated()){
+    res.status(401).send({error: 'not authenticated'})
   }
-  res.status(200).send(userInfo)
+  else{
+    let followers = [];
+    let result = await pool.query(
+    `select f.follower_id id
+    From follower f
+    where f.user_id = $1`, [req.user.id])
+    let rows = result.rows;
+    followers = rows;
+
+    let userInfo = {
+      isAuthenticated: req.isAuthenticated(),
+      userData : {
+        id: req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+        imgurl: req.user.imgurl,
+        city: req.user.city,
+        state: req.user.state,
+        followers: followers,
+      },
+    }
+    res.status(200).send(userInfo)
+
+  }
 }
 
 const profile = (req, res) => {
@@ -235,5 +307,8 @@ module.exports = {
     getGlobalFeedEvents,
     profile,
     loginStatus,
-    uploadProfilePic
+    uploadProfilePic,
+    followUser,
+    unfollowUser,
+    getUserFollowers
 }
