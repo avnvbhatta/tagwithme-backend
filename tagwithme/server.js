@@ -8,7 +8,10 @@ const db = require('./queries')
 const passport = require('passport')
 const jwt = require('jsonwebtoken');
 var multer  = require('multer')
-const path = require('path')
+
+app.use(cors())
+
+
 app.use(express.static('public'));
 
 
@@ -25,7 +28,6 @@ var storage = multer.diskStorage({
 var upload = multer({ storage: storage })
 app.use(bodyParser.json()); 
 app.use( bodyParser.urlencoded({ extended : false }) );
-app.use(cors())
 require('./auth');
 
 
@@ -50,7 +52,8 @@ app.use('/uploads', express.static(__dirname + '/uploads'));
 */
 app.post('/register', db.register);
 app.post('/login', async (req, res, next) => {
-  passport.authenticate('login', async (err, user, info) => {     try {
+  passport.authenticate('login', async (err, user, info) => {     
+    try {
       if(err || !user){
         console.log(err)
         const error = new Error('An Error occurred')
@@ -66,7 +69,8 @@ app.post('/login', async (req, res, next) => {
         const token = jwt.sign({ user : body }, process.env.TOKEN_SECRET, {expiresIn: '1d'});
         //Send back the token to the user
         return res.json({ token });
-      });     } catch (error) {
+      });     
+    } catch (error) {
       return next(error);
     }
   })(req, res, next);
@@ -111,6 +115,6 @@ app.use((req, res, next) => {
   })
  })
 
-app.listen(port, () => {
-    console.log(`App runnning on port ${port}.`)
-})
+
+var server = require('http').createServer(app);
+server.listen(port);

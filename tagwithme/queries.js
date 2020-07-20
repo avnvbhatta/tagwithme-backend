@@ -16,11 +16,11 @@ const getUserById = (request, response) => {
     const id = parseInt(request.params.id)
     pool.query(
     `SELECT id, name, city, state, imgurl, 
-    count(distinct f1.follower_id) followerCount,
+    count(distinct f1.following_id) followerCount,
     count(distinct f2.user_id) followingCount
     FROM users u
     left join follower f1 on (u.id = f1.user_id)
-    left join follower f2 on (u.id = f2.follower_id) 
+    left join follower f2 on (u.id = f2.following_id) 
     WHERE u.id = $1
     group by id, name, city, state, imgurl`, [id], (error, results) => {
         if (error) {
@@ -192,11 +192,11 @@ const getGlobalFeedEvents = (req, res) => {
 
 
 const followUser = (req, res) => {
-    const{user_id, follower_id} = req.body;
+    const{user_id, following_id} = req.body;
     pool.query(
-      `INSERT INTO follower(user_id, follower_id)
+      `INSERT INTO follower(user_id, following_id)
         VALUES ($1, $2)
-      `, [user_id, follower_id], (error, results) => {
+      `, [user_id, following_id], (error, results) => {
         if(error){
           throw error;
         }
@@ -206,9 +206,9 @@ const followUser = (req, res) => {
 }
 
 const unfollowUser = (req, res) => {
-  const{user_id, follower_id} = req.body;
+  const{user_id, following_id} = req.body;
   pool.query(
-    `DELETE FROM follower WHERE user_id=$1 and follower_id=$2`, [user_id, follower_id], (error, results) => {
+    `DELETE FROM follower WHERE user_id=$1 and following_id=$2`, [user_id, following_id], (error, results) => {
       if(error){
         throw error;
       }
@@ -222,20 +222,20 @@ const getUserFollowers = async (req, res) => {
     let followers = [];
     let following = [];
     let result = await pool.query(
-    `select f.follower_id id, u.name , u.imgurl  
+    `select f.following_id id, u.name , u.imgurl  
     From follower f
-    join users u on (u.id = f.follower_id) 
+    join users u on (u.id = f.following_id) 
     where f.user_id = $1`, [id])
     let rows = result.rows;
-    followers = rows;
+    following = rows;
 
     result = await pool.query(
       `select f.user_id id, u.name , u.imgurl  
        From follower f
        join users u on (u.id = f.user_id) 
-       where f.follower_id = $1`, [id])
+       where f.following_id = $1`, [id])
     rows = result.rows;
-    following = rows;
+    followers = rows;
     
     res.status(200).send({followers, following})
 }
@@ -261,12 +261,23 @@ const loginStatus = async (req, res) => {
     res.status(401).send({error: 'not authenticated'})
   }
   else{
+    let id = req.user.id;
     let followers = [];
+    let following = [];
     let result = await pool.query(
-    `select f.follower_id id
+    `select f.following_id id, u.name , u.imgurl  
     From follower f
-    where f.user_id = $1`, [req.user.id])
+    join users u on (u.id = f.following_id) 
+    where f.user_id = $1`, [id])
     let rows = result.rows;
+    following = rows;
+
+    result = await pool.query(
+      `select f.user_id id, u.name , u.imgurl  
+       From follower f
+       join users u on (u.id = f.user_id) 
+       where f.following_id = $1`, [id])
+    rows = result.rows;
     followers = rows;
 
     let userInfo = {
@@ -279,7 +290,8 @@ const loginStatus = async (req, res) => {
         city: req.user.city,
         state: req.user.state,
         followers: followers,
-      },
+        following: following
+      }
     }
     res.status(200).send(userInfo)
 
