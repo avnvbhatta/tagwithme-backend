@@ -1,5 +1,61 @@
 const { pool } = require('./dbConfig')
 const bcrypt = require('bcrypt')
+const socketIo = require('socket.io')
+const io = socketIo(4001)
+
+let interval;
+let clients = {}
+io.on('connection', (socket) => {
+	console.log('New Client Connected', socket.id);
+	socket.on('data', function(data){
+		console.log(`data received is ${data}`);
+		clients[data] = socket;
+	})
+
+	if(interval){
+		clearInterval(interval);
+	}
+
+	socket.on('disconnect', ()=>{
+		console.log('client disconnected');
+		clearInterval(interval);
+	});
+
+
+});
+
+
+const sendMessage = async(req,res) => {
+	const {sender_id, receiver_id, message} = req.body.data;
+	try{
+		let results = await pool.query(`INSERT INTO chat(sender_id, receiver_id, message, timestamp) 
+			VALUES ($1, $2, $3, now() ) returning *
+			`,[sender_id, receiver_id, message]);
+		io.to(clients[receiver_id].id).emit('FromAPI/message', results.rows[0]);
+		io.to(clients[sender_id].id).emit('FromAPI/message', results.rows[0]);
+	}
+	catch(error){
+		console.log('error in sendMessage', error);
+		throw error;
+	}
+}
+ 
+const getMessages = async(req,res) => {
+	const {sender_id, receiver_id} = req.body.data;
+	console.log(sender_id, receiver_id);
+	try{
+		let results = await pool.query(
+			`SELECT sender_id, receiver_id, message, timestamp from chat
+			where sender_id in ($1,$2) and receiver_id in ($1,$2) order by timestamp asc
+			`, [sender_id, receiver_id]);
+		res.status(200).send(results.rows);
+	}
+	catch(error){
+		console.log('error in getMessages', error);
+		throw error;
+	}
+	
+}
 
 //Get list of users
 const getUsers = async (request, response) => {
@@ -204,6 +260,7 @@ const followUser = async (req, res) => {
           VALUES ($1, $2)
         `, [user_id, following_id]);
         res.status(200).send({message: 'follow successful'})
+	clients[following_id].emit('FromAPI', `followed by ${user_id}`);
 
     } catch (error) {
       console.log('error in followUser', error);
@@ -336,5 +393,7 @@ module.exports = {
     uploadProfilePic,
     followUser,
     unfollowUser,
-    getUserFollowers
+    getUserFollowers,
+	sendMessage,
+	getMessages
 }

@@ -8,7 +8,7 @@ const db = require('./queries')
 const passport = require('passport')
 const jwt = require('jsonwebtoken');
 var multer  = require('multer')
-
+const path = require('path')
 app.use(cors())
 
 
@@ -105,7 +105,8 @@ app.get('/get-followers/:id', isValidJWT, db.getUserFollowers)
 //Image upload
 app.post('/profile-pic-upload', upload.single('picture'), db.uploadProfilePic);
 
-
+app.post('/send-message', isValidJWT, db.sendMessage);
+app.post('/get-messages', isValidJWT, db.getMessages);
 
 //Handle errors
 app.use((req, res, next) => {
@@ -117,4 +118,7 @@ app.use((req, res, next) => {
 
 
 var server = require('http').createServer(app);
+console.log("Starting server at port", port)
 server.listen(port);
+
+module.exports = {app,server}
