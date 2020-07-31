@@ -7,37 +7,66 @@ let interval;
 let clients = {}
 io.on('connection', (socket) => {
 	console.log('New Client Connected', socket.id);
-	socket.on('data', function(data){
-		console.log(`data received is ${data}`);
-		clients[data] = socket;
+	socket.on('user_id', function(user_id){
+		console.log(`data received is ${user_id}`);
+		if(!Object.values(clients).includes(user_id) && user_id != null){
+			socket.username = user_id;
+			clients[user_id] = socket;
+		}
+
 	})
 
 	if(interval){
 		clearInterval(interval);
 	}
 
+	socket.on('isOnline', function(user_id){
+		console.log('is online user_id', user_id);
+		if(user_id in clients){
+			socket.emit('isOnline', true);
+		}
+		else{
+			socket.emit('isOnline', false);
+		}
+	})
+
 	socket.on('disconnect', ()=>{
-		console.log('client disconnected');
+		console.log('client disconnected', socket.username);
+		socket.emit('isOnline',  false);
 		clearInterval(interval);
+		delete clients[socket.username];;	
 	});
 
-
+	console.log('num of online users',Object.values(clients).length)
 });
 
 
 const sendMessage = async(req,res) => {
+	req.setTimeout(200);
 	const {sender_id, receiver_id, message} = req.body.data;
 	try{
 		let results = await pool.query(`INSERT INTO chat(sender_id, receiver_id, message, timestamp) 
 			VALUES ($1, $2, $3, now() ) returning *
 			`,[sender_id, receiver_id, message]);
-		io.to(clients[receiver_id].id).emit('FromAPI/message', results.rows[0]);
-		io.to(clients[sender_id].id).emit('FromAPI/message', results.rows[0]);
+		try{
+
+
+			io.to(clients[sender_id].id).emit('FromAPI/message', results.rows[0]);
+			io.to(clients[receiver_id].id).emit('FromAPI/message', results.rows[0]);
+
+			io.to(clients[receiver_id].id).emit('FromAPI/newMessageNotification', sender_id);
+
+		}
+		catch(error){
+			console.log('Client offline');	
+			return res.status(200).send('Client offline. Message sent.');
+		}
 	}
 	catch(error){
 		console.log('error in sendMessage', error);
-		throw error;
+		return res.status(500).send('Failed to send message');
 	}
+	res.status(200).send('Success');
 }
  
 const getMessages = async(req,res) => {
@@ -57,6 +86,34 @@ const getMessages = async(req,res) => {
 	
 }
 
+//Get list of users that the user has sent a message too
+const getChatUsers = async(req, res) => {
+	const {sender_id} = req.body.data;
+	try{
+		let results = await pool.query(
+			`
+				select cc.id, cc.name, cc.imgurl, c.message, c.timestamp From chat c
+				join (
+					select u.id, u.name, u.imgurl, max(message_id)message_id From (
+						select receiver_id id, max(message_id) message_id From chat where sender_id = $1  group by receiver_id
+						union
+						select sender_id id, max(message_id) message_id From chat where receiver_id = $1  group by sender_id
+					) temp 
+				join users u on (temp.id = u.id)
+				group by u.id, u.name, u.imgurl
+											
+				) cc on (c.message_id = cc.message_id)
+				order by timestamp desc
+			`
+
+			,[sender_id]);
+		res.status(200).send(results.rows);
+	}
+	catch(error){
+		console.log('error in getChatUsers', error);
+		throw error;
+	}
+}
 //Get list of users
 const getUsers = async (request, response) => {
   try {
@@ -260,7 +317,7 @@ const followUser = async (req, res) => {
           VALUES ($1, $2)
         `, [user_id, following_id]);
         res.status(200).send({message: 'follow successful'})
-	clients[following_id].emit('FromAPI', `followed by ${user_id}`);
+	clients[following_id].emit('FromAPI/newGeneralNotification', `followed by ${user_id}`);
 
     } catch (error) {
       console.log('error in followUser', error);
@@ -395,5 +452,6 @@ module.exports = {
     unfollowUser,
     getUserFollowers,
 	sendMessage,
-	getMessages
+	getMessages,
+	getChatUsers
 }

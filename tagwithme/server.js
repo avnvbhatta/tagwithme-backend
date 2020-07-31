@@ -107,6 +107,7 @@ app.post('/profile-pic-upload', upload.single('picture'), db.uploadProfilePic);
 
 app.post('/send-message', isValidJWT, db.sendMessage);
 app.post('/get-messages', isValidJWT, db.getMessages);
+app.post('/get-chat-users', isValidJWT, db.getChatUsers);
 
 //Handle errors
 app.use((req, res, next) => {
