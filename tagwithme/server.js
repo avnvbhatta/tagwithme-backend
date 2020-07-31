@@ -109,6 +109,11 @@ app.post('/send-message', isValidJWT, db.sendMessage);
 app.post('/get-messages', isValidJWT, db.getMessages);
 app.post('/get-chat-users', isValidJWT, db.getChatUsers);
 
+app.post('/add-comment', isValidJWT, db.addComment);
+
+app.put('/update-likes', isValidJWT, db.updateLikes);
+
+
 //Handle errors
 app.use((req, res, next) => {
   res.status(404).send({

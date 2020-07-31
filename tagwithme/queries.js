@@ -225,9 +225,18 @@ const getInterestedEvents = async (req, res) =>{
   try {
     let results = await pool.query(
       `SELECT id, name, segment, genre, starttime, startdate, images, url, venue, distance, address, city,
-       state, lat, lng, parking, pricerange, postalcode, user_id from events e 
+       state, lat, lng, parking, pricerange, postalcode, ie.user_id, ie.like_user_id from events e 
        join interested_events ie on (ie.event_id = e.id)
-       WHERE user_Id = $1`, 
+       LEFT JOIN (
+       	SELECT user_id, event_id, json_agg(comms) as "comments" 
+       	FROM
+       	(SELECT user_id, event_id, author_id, u.name author_name, u.imgurl author_imgurl, comment, created_at from comments c
+ 		join users u on (u.id = c.author_id)      	
+       	where user_id = $1) as comms
+       	GROUP BY user_id, event_id
+       ) c on (ie.user_id = c.user_id and ie.event_id = c.event_id)
+       
+       WHERE ie.user_Id = $1`, 
        [userId]);
     res.status(200).send(results.rows)
 
@@ -291,10 +300,18 @@ const getGlobalFeedEvents = async (req, res) => {
     let results = await pool.query(
       `SELECT e.id id, e.name, segment, genre, starttime, startdate, images, url, venue, distance, address, e.city,
        e.state, lat, lng, parking, pricerange, postalcode, u.name userName, timestamp, u.imgurl, u.id userid,
-       case when e.id in (select distinct event_id from interested_events where user_id = $4) then true else false end isInterested
+       case when e.id in (select distinct event_id from interested_events where user_id = $4) then true else false end isInterested, ie.likes, ie.like_user_id, c.comments 
        from events e
        JOIN interested_events ie on (ie.event_id = e.id)
        JOIN users u on (ie.user_id = u.id)
+       LEFT JOIN (
+       	SELECT user_id, event_id, json_agg(comms) as "comments" 
+       	FROM
+       	(SELECT user_id, event_id, author_id, u.name author_name, u.imgurl author_imgurl, comment, created_at from comments c
+       	join users u on (u.id = c.author_id)
+       	) as comms
+       	GROUP BY user_id, event_id
+       ) c on (ie.user_id = c.user_id and ie.event_id = c.event_id)
        WHERE earth_box(ll_to_earth($1, $2), ($3/0.8) * 10000) @> ll_to_earth(lat, lng) and u.id != $4;
        `, 
        [lat, lng, radius, userId]);
@@ -435,6 +452,59 @@ const profile = (req, res) => {
 }
 
 
+const addComment = async (req,res) => {
+	const {user_id, event_id, author_id, comment} =  req.body;
+	try{
+		let results = await pool.query(
+		
+		`
+		INSERT INTO comments (user_id, event_id, author_id, comment, created_at)
+		VALUES ($1, $2, $3, $4, now())`,[user_id, event_id, author_id, comment]);
+		
+		res.status(200).send('Insert successful');
+		
+	}
+	catch(error){
+		console.log('Error in insertComment', error);
+		res.status(500).send('Error adding comment');
+		throw error;
+	}
+
+}
+
+
+const updateLikes = async (req,res) => {
+		
+	const {liker_id, user_id, event_id, increment} = req.body;
+	try{
+		if(increment){
+			let results = await pool.query(
+			`
+			UPDATE interested_events
+			SET like_user_id = like_user_id || $1, likes = likes + 1
+			WHERE NOT ($1 = ANY (like_user_id))
+			AND event_id = $2 and user_id = $3
+			`, [liker_id, event_id, user_id]);
+		}
+		else{
+			let results = await pool.query(
+			`
+			UPDATE interested_events
+			SET like_user_id = array_remove(like_user_id, $1), likes = likes - 1
+			WHERE  ($1 = ANY (like_user_id))
+			AND event_id = $2 and user_id = $3
+			`, [liker_id, event_id, user_id] );
+		}
+		res.status(200).send('Like successful');
+	}
+	catch(error) {
+			console.log('Error in updateLikes', error);
+			res.status(500).send('Error updating likes');
+			throw error;
+	}
+
+
+}
 module.exports = {
     getUsers,
     getUserById,
@@ -453,5 +523,7 @@ module.exports = {
     getUserFollowers,
 	sendMessage,
 	getMessages,
-	getChatUsers
+	getChatUsers,
+	addComment,
+	updateLikes
 }
