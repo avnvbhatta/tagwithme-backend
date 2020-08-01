@@ -223,22 +223,28 @@ const register = async (req, res) => {
 const getInterestedEvents = async (req, res) =>{
   const userId = parseInt(req.params.userId);
   try {
-    let results = await pool.query(
-      `SELECT id, name, segment, genre, starttime, startdate, images, url, venue, distance, address, city,
-       state, lat, lng, parking, pricerange, postalcode, ie.user_id, ie.like_user_id from events e 
-       join interested_events ie on (ie.event_id = e.id)
-       LEFT JOIN (
-       	SELECT user_id, event_id, json_agg(comms) as "comments" 
-       	FROM
-       	(SELECT user_id, event_id, author_id, u.name author_name, u.imgurl author_imgurl, comment, created_at from comments c
- 		join users u on (u.id = c.author_id)      	
-       	where user_id = $1) as comms
-       	GROUP BY user_id, event_id
-       ) c on (ie.user_id = c.user_id and ie.event_id = c.event_id)
-       
-       WHERE ie.user_Id = $1`, 
-       [userId]);
-    res.status(200).send(results.rows)
+    
+
+	  let results = await pool.query(
+		        `SELECT e.id id, e.name, segment, genre, starttime, startdate, images, url, venue, distance, address, e.city,
+		       e.state, lat, lng, parking, pricerange, postalcode, u.name userName, timestamp, u.imgurl, u.id userid,
+		      case when e.id in (select distinct event_id from interested_events where user_id = $1) then true else false end isInterested, ie.likes, ie.like_user_id, c.comments 
+		       from events e
+		       JOIN interested_events ie on (ie.event_id = e.id)
+		       JOIN users u on (ie.user_id = u.id)
+		       LEFT JOIN (
+		      	SELECT user_id, event_id, json_agg(comms) as "comments" 
+		       	FROM
+		       	(SELECT user_id, event_id, author_id, u.name author_name, u.imgurl author_imgurl, comment, created_at from comments c
+		       	join users u on (u.id = c.author_id)
+		      	) as comms
+		      	GROUP BY user_id, event_id
+		     ) c on (ie.user_id = c.user_id and ie.event_id = c.event_id)
+		     WHERE u.id = $1 
+		     ORDER BY timestamp desc
+		  ;`, 
+		         [userId]);
+	  res.status(200).send(results.rows)
 
   } catch (error) {
       console.log("error in getInterestedEvents", error)
