@@ -246,6 +246,34 @@ const getInterestedEvents = async (req, res) =>{
   }
 }
 
+const getInterestedEvent = async (req, res) =>{
+  const {user_id, event_id} = req.body;
+  try {
+    let results = await pool.query(
+      `SELECT e.id id, e.name, segment, genre, starttime, startdate, images, url, venue, distance, address, e.city,
+       e.state, lat, lng, parking, pricerange, postalcode, u.name userName, timestamp, u.imgurl, u.id userid,
+       case when e.id in (select distinct event_id from interested_events where user_id = $1) then true else false end isInterested, ie.likes, ie.like_user_id, c.comments 
+       from events e
+       JOIN interested_events ie on (ie.event_id = e.id)
+       JOIN users u on (ie.user_id = u.id)
+       LEFT JOIN (
+       	SELECT user_id, event_id, json_agg(comms) as "comments" 
+       	FROM
+       	(SELECT user_id, event_id, author_id, u.name author_name, u.imgurl author_imgurl, comment, created_at from comments c
+       	join users u on (u.id = c.author_id)
+       	) as comms
+       	GROUP BY user_id, event_id
+       ) c on (ie.user_id = c.user_id and ie.event_id = c.event_id)
+       WHERE u.id = $1 and ie.event_id=$2;
+       `, 
+       [user_id, event_id]);
+    res.status(200).send(results.rows)
+
+  } catch (error) {
+      console.log("error in getInterestedEvent", error)
+      throw error;
+  }
+}
 const createInterestedEvent = async (req, res) =>{
   const { id, name, segment, genre, startTime, startDate, images, url, venue, distance, address,
     city, state, lat, lng, parking, priceRange, postalCode, userId } = req.body;
@@ -333,7 +361,13 @@ const followUser = async (req, res) => {
         `INSERT INTO follower(user_id, following_id)
           VALUES ($1, $2)
         `, [user_id, following_id]);
-        res.status(200).send({message: 'follow successful'})
+	
+	results = pool.query(
+	`insert into notifications 
+	(type, sender_id, receiver_id, created_at)
+	values ('follow', $1, $2, now())`, [user_id, following_id]);
+        
+	res.status(200).send({message: 'follow successful'})
 	clients[following_id].emit('FromAPI/newGeneralNotification', `followed by ${user_id}`);
 
     } catch (error) {
@@ -461,7 +495,13 @@ const addComment = async (req,res) => {
 		INSERT INTO comments (user_id, event_id, author_id, comment, created_at)
 		VALUES ($1, $2, $3, $4, now())`,[user_id, event_id, author_id, comment]);
 		
+		results = pool.query(
+		`insert into notifications 
+		(type, sender_id, receiver_id, event_id, created_at)
+		values ('comment', $1, $2, $3, now())`, [author_id, user_id, event_id]);
+		
 		res.status(200).send('Insert successful');
+
 		
 	}
 	catch(error){
@@ -485,6 +525,12 @@ const updateLikes = async (req,res) => {
 			WHERE NOT ($1 = ANY (like_user_id))
 			AND event_id = $2 and user_id = $3
 			`, [liker_id, event_id, user_id]);
+
+
+			results = pool.query(
+			`insert into notifications 
+			(type, sender_id, receiver_id, event_id, created_at)
+			values ('like', $1, $2, $3, now())`, [liker_id, user_id, event_id]);
 		}
 		else{
 			let results = await pool.query(
@@ -502,8 +548,27 @@ const updateLikes = async (req,res) => {
 			res.status(500).send('Error updating likes');
 			throw error;
 	}
-
-
+}
+const getNotifications = async (req, res) =>{
+	const {user_id} = req.body;
+	try{
+		let results = await pool.query(
+			`
+			select u.id sender_id, u.name sender_name, u.imgurl sender_imgurl, 
+			n.type, receiver_id, event_id, created_at 
+			from notifications n
+			join users u on (u.id = n.sender_id)
+			where receiver_id = $1
+			order by created_at desc
+			`, [user_id]);
+		res.status(200).send(results.rows);
+		
+	}
+	catch(error){
+		console.log('Error in getNotifications', getNotifications);
+		res.status(500).send('Error in getNotifications');
+		throw error;
+	}
 }
 module.exports = {
     getUsers,
@@ -525,5 +590,7 @@ module.exports = {
 	getMessages,
 	getChatUsers,
 	addComment,
-	updateLikes
+	updateLikes,
+	getNotifications,
+	getInterestedEvent
 }

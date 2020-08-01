@@ -113,6 +113,10 @@ app.post('/add-comment', isValidJWT, db.addComment);
 
 app.put('/update-likes', isValidJWT, db.updateLikes);
 
+app.post('/get-notifications', isValidJWT, db.getNotifications);
+
+app.post('/get-interested-event', isValidJWT, db.getInterestedEvent);
+
 
 //Handle errors
 app.use((req, res, next) => {
