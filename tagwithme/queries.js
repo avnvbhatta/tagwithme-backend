@@ -5,6 +5,8 @@ const io = socketIo(4001)
 
 let interval;
 let clients = {}
+let offlineMessageNotifUsers = {};
+let offlineGeneralNotifUsers = {};
 io.on('connection', (socket) => {
 	console.log('New Client Connected', socket.id);
 	socket.on('user_id', function(user_id){
@@ -12,6 +14,16 @@ io.on('connection', (socket) => {
 		if(!Object.values(clients).includes(user_id) && user_id != null){
 			socket.username = user_id;
 			clients[user_id] = socket;
+			if(user_id in offlineMessageNotifUsers){
+				io.to(clients[user_id].id).emit('FromAPI/newMessageNotification', 'you have new messages');
+				delete offlineMessageNotifUsers[user_id];
+			}
+
+
+			if(user_id in offlineGeneralNotifUsers){
+				io.to(clients[user_id].id).emit('FromAPI/newGeneralNotification', 'you have new notifications');
+				delete offlineGeneralNotifUsers[user_id];
+			}
 		}
 
 	})
@@ -52,9 +64,14 @@ const sendMessage = async(req,res) => {
 
 
 			io.to(clients[sender_id].id).emit('FromAPI/message', results.rows[0]);
-			io.to(clients[receiver_id].id).emit('FromAPI/message', results.rows[0]);
+			if(receiver_id in clients){
 
-			io.to(clients[receiver_id].id).emit('FromAPI/newMessageNotification', sender_id);
+				io.to(clients[receiver_id].id).emit('FromAPI/message', results.rows[0]);
+				io.to(clients[receiver_id].id).emit('FromAPI/newMessageNotification', sender_id);
+			}else{
+				offlineMessageNotifUsers[receiver_id] = true;
+			}
+
 
 		}
 		catch(error){
@@ -374,7 +391,15 @@ const followUser = async (req, res) => {
 	values ('follow', $1, $2, now())`, [user_id, following_id]);
         
 	res.status(200).send({message: 'follow successful'})
-	clients[following_id].emit('FromAPI/newGeneralNotification', `followed by ${user_id}`);
+
+	if(following_id in clients){
+
+	    clients[following_id].emit('FromAPI/newGeneralNotification', `followed by ${user_id}`);
+	}else{
+		offlineGeneralNotifUsers[following_id] = true;
+	}
+
+
 
     } catch (error) {
       console.log('error in followUser', error);
@@ -506,9 +531,16 @@ const addComment = async (req,res) => {
 		(type, sender_id, receiver_id, event_id, created_at)
 		values ('comment', $1, $2, $3, now())`, [author_id, user_id, event_id]);
 		
-		res.status(200).send('Insert successful');
 
-		
+		if(user_id in clients){
+
+		    clients[user_id].emit('FromAPI/newGeneralNotification', `${author_id} commented on your post}`);
+		}else{
+			offlineGeneralNotifUsers[user_id] = true;
+		}
+			res.status(200).send('Insert successful');
+
+			
 	}
 	catch(error){
 		console.log('Error in insertComment', error);
@@ -537,6 +569,15 @@ const updateLikes = async (req,res) => {
 			`insert into notifications 
 			(type, sender_id, receiver_id, event_id, created_at)
 			values ('like', $1, $2, $3, now())`, [liker_id, user_id, event_id]);
+
+
+			if(user_id in clients){
+
+			    clients[user_id].emit('FromAPI/newGeneralNotification', `${author_id} liked your post}`);
+			}else{
+				offlineGeneralNotifUsers[user_id] = true;
+			}
+
 		}
 		else{
 			let results = await pool.query(
