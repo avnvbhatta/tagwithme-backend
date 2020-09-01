@@ -605,7 +605,7 @@ const getNotifications = async (req, res) =>{
 			n.type, receiver_id, event_id, created_at 
 			from notifications n
 			join users u on (u.id = n.sender_id)
-			where receiver_id = $1
+			where receiver_id = $1 and sender_id !=$1
 			order by created_at desc
 			`, [user_id]);
 		res.status(200).send(results.rows);
