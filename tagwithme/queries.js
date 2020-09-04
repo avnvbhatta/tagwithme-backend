@@ -168,13 +168,13 @@ const getUserById = async (request, response) => {
 
 //Update specific user by ID
 const updateUser = async (request, response) => {
-    const id = parseInt(request.params.id);
-    const { name, email, password } = request.body;
+    const {id, name, city, state } = request.body;
+	console.log(id, name, city, state)
     try {
       let results =  await pool.query(
-        'UPDATE users SET name = $1, email = $2, password=$3 WHERE id = $4',
-        [name, email, password, id]);
-      response.status(200).send(`User modified with ID: ${id}`)
+        'UPDATE users SET name = $1, city = $2, state=$3 WHERE id = $4',
+        [name, city, state, id]);
+      response.status(200).send(`User modified`)
 
     } catch (error) {
       console.log("error in updateUser", error)
@@ -569,13 +569,16 @@ const updateLikes = async (req,res) => {
 			`insert into notifications 
 			(type, sender_id, receiver_id, event_id, created_at)
 			values ('like', $1, $2, $3, now())`, [liker_id, user_id, event_id]);
+			
+			//don't send notification to yourself
+			if(user_id !== liker_id){
 
+				if(user_id in clients){
 
-			if(user_id in clients){
-
-			    clients[user_id].emit('FromAPI/newGeneralNotification', `${author_id} liked your post}`);
-			}else{
-				offlineGeneralNotifUsers[user_id] = true;
+			    	clients[user_id].emit('FromAPI/newGeneralNotification', `${liker_id} liked your post}`);
+				}else{
+					offlineGeneralNotifUsers[user_id] = true;
+				}
 			}
 
 		}

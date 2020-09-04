@@ -88,7 +88,7 @@ app.get('/login-status', isValidJWT, db.loginStatus);
 //CRUD Operations
 // app.get('/users', isAuthenticated, db.getUsers)
 app.get('/users/:id', isValidJWT, db.getUserById)
-// app.put('/users/:id', isAuthenticated, db.updateUser)
+app.post('/update-user', isValidJWT, db.updateUser)
 // app.delete('/users/:id', isAuthenticated, db.deleteUser)
 
 //Interested events
